@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Frases</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #00377f; /* Azul dos Correios */
+        }
+        .toast {
+            transition: opacity 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center">
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-2xl mx-4">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">Gerenciador de Frases</h1>
+        <p class="text-sm text-center text-gray-500 mb-6">Salve e gerencie suas frases favoritas.</p>
+
+        <div class="flex items-center space-x-2 text-sm text-gray-500 mb-6">
+            <span class="font-semibold">ID do Usuário:</span>
+            <span id="userIdDisplay" class="truncate text-gray-700">Carregando...</span>
+        </div>
+
+        <!-- Tab Navigation System (Sistema de Guias) -->
+        <div id="tabContainer" class="flex border-b border-gray-200 mb-6">
+            <button data-segment="Guia 01" class="tab-button flex-1 py-2 text-sm font-semibold text-center border-b-2 border-yellow-500 text-yellow-600 hover:bg-gray-100 transition-colors">
+                Guia 01
+            </button>
+            <button data-segment="Guia 02" class="tab-button flex-1 py-2 text-sm font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors">
+                Guia 02
+            </button>
+            <button data-segment="Guia 03" class="tab-button flex-1 py-2 text-sm font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors">
+                Guia 03
+            </button>
+        </div>
+
+        <!-- Botões de Backup e Restauração movidos para o topo -->
+        <div class="flex justify-between space-x-2 mb-6">
+            <button id="backupBtn" class="w-1/2 bg-yellow-400 text-gray-800 text-sm font-bold p-2 rounded-lg hover:bg-yellow-500 transition-colors shadow-md">Fazer Backup</button>
+            <button id="restoreBtn" class="w-1/2 bg-yellow-400 text-gray-800 text-sm font-bold p-2 rounded-lg hover:bg-yellow-500 transition-colors shadow-md">Restaurar Backup</button>
+            <input type="file" id="fileInput" accept=".json" class="hidden">
+        </div>
+        
+        <div class="mb-6">
+            <label for="phraseInput" class="block text-gray-700 font-medium mb-2">Nova Frase (<span id="currentSegmentLabel">Guia 01</span>)</label>
+            <div class="flex space-x-2">
+                <input type="text" id="phraseInput" placeholder="Digite sua frase aqui..." class="flex-grow p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                <button id="addBtn" class="bg-yellow-400 text-gray-800 font-bold p-3 rounded-lg hover:bg-yellow-500 transition-colors shadow-md">Adicionar</button>
+            </div>
+        </div>
+
+        <div id="phrasesList" class="space-y-4">
+            <!-- As frases serão renderizadas aqui -->
+        </div>
+
+        <!-- Custom Modal for Alerts -->
+        <div id="alertModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="mt-3 text-center">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900" id="alertTitle"></h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p class="text-sm text-gray-500" id="alertMessage"></p>
+                    </div>
+                    <div class="items-center px-4 py-3">
+                        <button id="alertCloseBtn" class="px-4 py-2 bg-yellow-400 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                            OK
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Modal for Confirmation -->
+        <div id="confirmModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="mt-3 text-center">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">Confirmação</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p class="text-sm text-gray-500">Tem certeza de que deseja excluir esta frase?</p>
+                    </div>
+                    <div class="items-center px-4 py-3 space-y-2">
+                        <button id="confirmYesBtn" class="px-4 py-2 bg-red-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+                            Sim, Excluir
+                        </button>
+                        <button id="confirmNoBtn" class="px-4 py-2 bg-gray-300 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                            Não
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Temporary Toast Notification -->
+        <div id="toastNotification" class="toast fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-blue-900 text-white text-sm font-semibold rounded-full shadow-lg opacity-0">
+            Copiado para a área de transferência!
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, setLogLevel, getDocs, query, where, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // =================================================================================
+        // CONFIGURAÇÃO DO FIREBASE
+        // Estes dados são usados para conectar à base de dados 'ferramentasect'.
+        // Se estiver a executar localmente, este bloco garante a conexão.
+        // =================================================================================
+        const LOCAL_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyA_fD52_U31yOrFPXX20fI7oznwNcHceoM", 
+            authDomain: "ferramentasect.firebaseapp.com",
+            projectId: "ferramentasect", 
+            storageBucket: "ferramentasect.firebasestorage.app",
+            messagingSenderId: "59371795527",
+            appId: "1:59371795527:web:ab96b67d8bf8279bcbad62", 
+            measurementId: "G-HVNRX7ZVH0"
+        };
+
+        // Lógica para detetar o ambiente: Usa as variáveis globais do Canvas ou a configuração local.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : LOCAL_FIREBASE_CONFIG.projectId;
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : LOCAL_FIREBASE_CONFIG;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : '';
+        
+        setLogLevel('Debug');
+
+        let app, db, auth;
+        let userId = '';
+        let currentTab = 'Guia 01'; // Estado da guia atual
+        let unsubscribeListener = null; // Função para desinscrever do listener em tempo real
+        let currentPhrasesSnapshot = []; // Variável global para guardar a lista ordenada do snapshot
+
+        const phraseInput = document.getElementById('phraseInput');
+        const addBtn = document.getElementById('addBtn');
+        const phrasesList = document.getElementById('phrasesList');
+        const userIdDisplay = document.getElementById('userIdDisplay');
+        const alertModal = document.getElementById('alertModal');
+        const alertTitle = document.getElementById('alertTitle');
+        const alertMessage = document.getElementById('alertMessage');
+        const alertCloseBtn = document.getElementById('alertCloseBtn');
+        const confirmModal = document.getElementById('confirmModal');
+        const confirmYesBtn = document.getElementById('confirmYesBtn');
+        const confirmNoBtn = document.getElementById('confirmNoBtn');
+        const toastNotification = document.getElementById('toastNotification');
+        const backupBtn = document.getElementById('backupBtn');
+        const restoreBtn = document.getElementById('restoreBtn');
+        const fileInput = document.getElementById('fileInput');
+        const currentSegmentLabel = document.getElementById('currentSegmentLabel');
+
+
+        // Custom alert function (remains for other errors)
+        function showAlert(title, message) {
+            alertTitle.textContent = title;
+            alertMessage.textContent = message;
+            alertModal.classList.remove('hidden');
+        }
+
+        alertCloseBtn.onclick = function() {
+            alertModal.classList.add('hidden');
+        }
+
+        // Custom confirmation function
+        function showConfirmModal(callback) {
+            confirmModal.classList.remove('hidden');
+            confirmYesBtn.onclick = () => {
+                confirmModal.classList.add('hidden');
+                callback();
+            };
+            confirmNoBtn.onclick = () => {
+                confirmModal.classList.add('hidden');
+            };
+        }
+
+        // Temporary toast notification function
+        function showToast(message) {
+            toastNotification.textContent = message;
+            toastNotification.classList.remove('opacity-0', 'hidden');
+            toastNotification.classList.add('opacity-100');
+            setTimeout(() => {
+                toastNotification.classList.remove('opacity-100');
+                toastNotification.classList.add('opacity-0');
+                setTimeout(() => {
+                    toastNotification.classList.add('hidden');
+                }, 300); // Wait for transition to finish
+            }, 2000); // 2 seconds display time
+        }
+        
+        // --- Tab Management Functions ---
+        
+        // Função para atualizar o estilo da aba selecionada
+        function updateTabUI(selectedSegment) {
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                if (btn.getAttribute('data-segment') === selectedSegment) {
+                    btn.classList.add('border-yellow-500', 'text-yellow-600');
+                    btn.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                } else {
+                    btn.classList.remove('border-yellow-500', 'text-yellow-600');
+                    btn.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                }
+            });
+            currentSegmentLabel.textContent = selectedSegment;
+        }
+
+        // Função para trocar de aba
+        function switchTab(newSegment) {
+            if (newSegment === currentTab) return; // Não faz nada se for a mesma aba
+
+            currentTab = newSegment;
+            updateTabUI(newSegment);
+
+            // Desinscreve-se do listener anterior se existir
+            if (unsubscribeListener) {
+                unsubscribeListener();
+                unsubscribeListener = null;
+            }
+            
+            // Configura um novo listener para a nova aba
+            if (db && userId) {
+                setupRealtimeListener();
+            }
+        }
+
+        // Configura os ouvintes de evento para os botões de aba
+        function setupTabListeners() {
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const segment = e.currentTarget.getAttribute('data-segment');
+                    switchTab(segment);
+                });
+            });
+        }
+        // --- End Tab Management Functions ---
+
+        // Initialize Firebase on window load
+        window.onload = function() {
+            try {
+                // Se a chave for a placeholder E não houver configuração global, alerta.
+                if (LOCAL_FIREBASE_CONFIG.apiKey === "SEU_API_KEY_AQUI" && typeof __firebase_config === 'undefined') {
+                    showAlert("Erro de Configuração", "A configuração do Firebase está ausente ou incompleta.");
+                    return; 
+                }
+
+
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Sign in user
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        userIdDisplay.textContent = userId;
+                        updateTabUI(currentTab); // Inicializa a UI da aba
+                        setupTabListeners(); // Configura os ouvintes de clique das abas
+                        setupRealtimeListener(); // Inicia o listener da aba padrão
+                    } else {
+                        try {
+                            if (initialAuthToken) {
+                                // Execução no ambiente Canvas (token customizado)
+                                await signInWithCustomToken(auth, initialAuthToken);
+                            } else {
+                                // Execução local (login anónimo)
+                                await signInAnonymously(auth);
+                            }
+                        } catch (error) {
+                            console.error("Authentication failed:", error);
+                            // Se a autenticação falhar, usamos um ID aleatório para feedback (sem conexão ao Firestore)
+                            userId = crypto.randomUUID();
+                            userIdDisplay.textContent = `ID Anônimo/Erro: ${userId}`;
+                            showAlert("Erro de Autenticação", "Não foi possível autenticar. A base de dados não estará acessível.");
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                showAlert("Erro Fatal", "Não foi possível inicializar o Firebase. Verifique o console para mais detalhes.");
+            }
+        };
+
+        // Function to sanitize input
+        function sanitizeInput(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // =================================================================================
+        // FUNÇÃO DE MOVIMENTAÇÃO: Troca o valor de 'createdAt' entre a frase alvo e a vizinha.
+        // =================================================================================
+        async function movePhrase(docId, direction) {
+            if (!db || !userId || !auth.currentUser) {
+                showAlert("Erro de Conexão", "Aguarde a conexão e autenticação com o banco de dados.");
+                return;
+            }
+            
+            // 1. Encontra a frase alvo no snapshot atual
+            const targetIndex = currentPhrasesSnapshot.findIndex(p => p.id === docId);
+            
+            if (targetIndex === -1) return; // Frase não encontrada
+            
+            let neighborIndex;
+            if (direction === 'up') {
+                neighborIndex = targetIndex - 1;
+            } else { // 'down'
+                neighborIndex = targetIndex + 1;
+            }
+            
+            // 2. Verifica limites
+            if (neighborIndex < 0 || neighborIndex >= currentPhrasesSnapshot.length) {
+                showToast(direction === 'up' ? "Já está no topo." : "Já está no fim.");
+                return; // Já está no limite
+            }
+
+            const targetPhrase = currentPhrasesSnapshot[targetIndex];
+            const neighborPhrase = currentPhrasesSnapshot[neighborIndex];
+            
+            // IDs e Orders (timestamps) a serem trocados
+            const targetId = targetPhrase.id;
+            const neighborId = neighborPhrase.id;
+            let targetOrder = targetPhrase.createdAt;
+            let neighborOrder = neighborPhrase.createdAt;
+
+            // Prevenção de timestamps idênticos (muito raro)
+            if (targetOrder === neighborOrder) {
+                // Ajusta minimamente o order da vizinha para garantir a diferença
+                neighborOrder = direction === 'up' ? neighborOrder - 1 : neighborOrder + 1;
+            }
+
+            try {
+                const phrasesDocPathTarget = `artifacts/${appId}/users/${userId}/phrases/${targetId}`;
+                const phrasesDocPathNeighbor = `artifacts/${appId}/users/${userId}/phrases/${neighborId}`;
+                
+                // 3. Troca os valores de 'createdAt' no Firestore
+                await updateDoc(doc(db, phrasesDocPathTarget), {
+                    createdAt: neighborOrder // A alvo recebe o order do vizinho
+                });
+                
+                await updateDoc(doc(db, phrasesDocPathNeighbor), {
+                    createdAt: targetOrder // O vizinho recebe o order do alvo
+                });
+
+                showToast("Ordem alterada!");
+            } catch (error) {
+                console.error("Erro ao mover a frase: ", error);
+                showAlert("Erro de Movimentação", "Não foi possível alterar a ordem da frase.");
+            }
+        }
+
+        // Add a new phrase to Firestore
+        async function addPhrase(phraseText) {
+            const sanitizedPhrase = sanitizeInput(phraseText);
+            
+            try {
+                if (!db || !userId || !auth.currentUser) {
+                    showAlert("Erro de Conexão", "Aguarde a conexão e autenticação com o banco de dados.");
+                    return { success: false, message: "Aguarde a conexão e autenticação com o banco de dados." };
+                }
+                
+                const phrasesCollectionPath = `artifacts/${appId}/users/${userId}/phrases`;
+
+                // Check for existing phrase in the CURRENT segment
+                const q = query(collection(db, phrasesCollectionPath), 
+                                where("text", "==", sanitizedPhrase),
+                                where("segment", "==", currentTab) // Verifica duplicidade APENAS no segmento atual
+                               );
+                const querySnapshot = await getDocs(q);
+                
+                if (!querySnapshot.empty) {
+                    return { success: false, message: "Frase duplicada. Esta frase já existe na sua lista." };
+                }
+                
+                await addDoc(collection(db, phrasesCollectionPath), {
+                    text: sanitizedPhrase,
+                    segment: currentTab, // Salva o segmento da guia atual
+                    createdAt: Date.now() // Timestamp para ordenação
+                });
+                return { success: true };
+            } catch (error) {
+                console.error("Error adding document: ", error);
+                return { success: false, message: "Erro ao adicionar a frase. Verifique o console." };
+            }
+        }
+
+        // Update an existing phrase in Firestore
+        async function updatePhrase(docId, newText) {
+            const sanitizedText = sanitizeInput(newText);
+            
+            try {
+                if (!db || !userId || !auth.currentUser) {
+                    showAlert("Erro de Conexão", "Aguarde a conexão e autenticação com o banco de dados.");
+                    return { success: false, message: "Aguarde a conexão e autenticação com o banco de dados." };
+                }
+
+                const phrasesDocPath = `artifacts/${appId}/users/${userId}/phrases/${docId}`;
+                await updateDoc(doc(db, phrasesDocPath), {
+                    text: sanitizedText
+                });
+                return { success: true };
+            } catch (error) {
+                console.error("Error updating document: ", error);
+                return { success: false, message: "Erro ao atualizar a frase. Verifique o console." };
+            }
+        }
+
+        addBtn.addEventListener('click', async () => {
+            const phraseText = phraseInput.value.trim();
+            if (phraseText === "") {
+                showAlert("Campo Vazio", "Por favor, digite uma frase antes de adicionar.");
+                return;
+            }
+            const result = await addPhrase(phraseText);
+            if (result.success) {
+                phraseInput.value = "";
+            } else {
+                showAlert("Erro", result.message);
+            }
+        });
+
+        // Delete a phrase from Firestore
+        async function deletePhrase(docId) {
+            try {
+                if (!db || !userId || !auth.currentUser) {
+                     showAlert("Erro de Conexão", "Aguarde a conexão e autenticação com o banco de dados.");
+                     return;
+                }
+                const phrasesDocPath = `artifacts/${appId}/users/${userId}/phrases/${docId}`;
+                await deleteDoc(doc(db, phrasesDocPath));
+            } catch (error) {
+                console.error("Error removing document: ", error);
+                showAlert("Erro ao Excluir", "Não foi possível excluir a frase. Verifique o console.");
+            }
+        }
+
+        // Function to copy text to clipboard with fallback
+        async function copyPhrase(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast("Frase copiada!");
+            } catch (err) {
+                // Fallback for restricted environments like iframes
+                try {
+                    const tempInput = document.createElement('textarea');
+                    tempInput.value = text;
+                    document.body.appendChild(tempInput);
+                    tempInput.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(tempInput);
+                    showToast("Frase copiada!");
+                } catch (err2) {
+                    console.error('Fallback: Oops, unable to copy', err2);
+                    showAlert("Erro ao Copiar", "Não foi possível copiar o texto. Por favor, tente novamente.");
+                }
+            }
+        }
+
+        // Backup phrases to a JSON file
+        backupBtn.addEventListener('click', async () => {
+            try {
+                if (!db || !userId || !auth.currentUser) {
+                    showAlert("Erro", "Aguarde a conexão e autenticação com o banco de dados.");
+                    return;
+                }
+                // Faz backup de TODAS as frases, independentemente do segmento
+                const phrasesCollectionPath = `artifacts/${appId}/users/${userId}/phrases`;
+                const querySnapshot = await getDocs(collection(db, phrasesCollectionPath));
+                const phrasesWithSegment = [];
+                querySnapshot.forEach(doc => {
+                    // Inclui o segmento no backup para restauração correta
+                    const data = doc.data();
+                    phrasesWithSegment.push({ text: data.text, segment: data.segment || 'Guia 01' }); 
+                });
+
+                const jsonContent = JSON.stringify(phrasesWithSegment, null, 2);
+                const blob = new Blob([jsonContent], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `backup_frases_${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast("Backup criado!");
+            } catch (error) {
+                console.error("Erro ao fazer backup: ", error);
+                showAlert("Erro ao Fazer Backup", "Não foi possível criar o arquivo de backup.");
+            }
+        });
+
+        // Restore phrases from a JSON file
+        restoreBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) {
+                return;
+            }
+            
+            // Verificação de autenticação antes de iniciar o processo de restauração
+            if (!db || !userId || !auth.currentUser) {
+                showAlert("Erro de Conexão", "Aguarde a conexão e autenticação com o banco de dados para restaurar.");
+                fileInput.value = null; // Limpa o input file
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const content = e.target.result;
+                    const phrasesToRestore = JSON.parse(content);
+
+                    // Aceita o novo formato {text: string, segment: string} ou o formato antigo [string]
+                    const isOldFormat = phrasesToRestore.length > 0 && typeof phrasesToRestore[0] === 'string';
+
+                    if (!Array.isArray(phrasesToRestore)) {
+                        showAlert("Formato Inválido", "O arquivo JSON deve ser uma lista de frases.");
+                        return;
+                    }
+
+                    showToast("Iniciando restauração...");
+                    
+                    let addedCount = 0;
+                    let duplicateCount = 0;
+                    let failedCount = 0; // Contador de falhas
+
+                    for (const item of phrasesToRestore) {
+                        const phraseText = isOldFormat ? item : item.text;
+                        // Se for formato antigo ou o campo 'segment' não existir, usa a guia atual.
+                        const targetSegment = isOldFormat ? currentTab : (item.segment || currentTab);
+
+                        const sanitizedPhrase = sanitizeInput(phraseText);
+                        const phrasesCollectionPath = `artifacts/${appId}/users/${userId}/phrases`;
+                        
+                        try {
+                            // Verifica duplicidade no segmento de destino
+                            const q = query(collection(db, phrasesCollectionPath), 
+                                            where("text", "==", sanitizedPhrase),
+                                            where("segment", "==", targetSegment) 
+                            );
+                            const querySnapshot = await getDocs(q);
+
+                            if (querySnapshot.empty) {
+                                await addDoc(collection(db, phrasesCollectionPath), {
+                                    text: sanitizedPhrase,
+                                    segment: targetSegment, // Atribui ao segmento de destino
+                                    createdAt: Date.now()
+                                });
+                                addedCount++;
+                            } else {
+                                duplicateCount++;
+                            }
+                        } catch (insertionError) {
+                            console.error(`Erro ao adicionar frase '${phraseText}':`, insertionError);
+                            failedCount++;
+                        }
+                    }
+                    
+                    let finalMessage = `${addedCount} frases adicionadas. ${duplicateCount} duplicadas ignoradas.`;
+                    
+                    if (failedCount > 0) {
+                        finalMessage += ` ${failedCount} falharam. Verifique o console para detalhes.`;
+                        showAlert("Restauração Parcial/Falha", finalMessage); 
+                    } else {
+                        showToast(`Restauração concluída! ${finalMessage}`);
+                    }
+
+
+                } catch (error) {
+                    console.error("Erro ao restaurar backup: ", error);
+                    showAlert("Erro de Restauração", "Não foi possível carregar as frases. Verifique se o arquivo está no formato JSON correto.");
+                } finally {
+                    fileInput.value = null; // Garante que o input pode receber o mesmo ficheiro novamente
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // Setup real-time listener for phrases
+        function setupRealtimeListener() {
+            if (!db || !userId || !auth.currentUser) {
+                // Não inicia o listener se a autenticação ainda não estiver completa
+                phrasesList.innerHTML = `<p class="text-center text-red-500">Aguardando a autenticação do Firebase...</p>`;
+                return;
+            }
+            
+            const phrasesCollectionPath = `artifacts/${appId}/users/${userId}/phrases`;
+            
+            // Query filtra as frases APENAS do segmento atual
+            const q = query(
+                collection(db, phrasesCollectionPath),
+                where("segment", "==", currentTab)
+            );
+
+            // Desinscreve-se do listener anterior antes de iniciar um novo
+            if (unsubscribeListener) {
+                unsubscribeListener();
+            }
+
+            unsubscribeListener = onSnapshot(q, (querySnapshot) => {
+                phrasesList.innerHTML = ''; // Clear existing list
+                
+                let phrases = [];
+                querySnapshot.forEach((doc) => {
+                    phrases.push({ id: doc.id, ...doc.data() });
+                });
+
+                // NOVO: Ordenação Client-Side pelo campo 'createdAt' (ascendente = mais antigo no topo)
+                phrases.sort((a, b) => a.createdAt - b.createdAt);
+                
+                // Atualiza o snapshot global para a função movePhrase poder trabalhar
+                currentPhrasesSnapshot = phrases;
+
+                if (phrases.length === 0) {
+                    phrasesList.innerHTML = `<p class="text-center text-gray-500">Nenhuma frase salva na ${currentTab} ainda.</p>`;
+                    return;
+                }
+                
+                phrases.forEach((phrase, index) => {
+                    const originalText = phrase.text;
+                    const phraseId = phrase.id;
+
+                    const phraseDiv = document.createElement('div');
+                    // Garante que o texto se expande para preencher o espaço restante entre os botões
+                    phraseDiv.className = 'flex items-center justify-between p-4 bg-gray-50 rounded-lg shadow-sm'; 
+                    
+                    // Texto da frase: agora com contentEditable="false"
+                    const textSpan = document.createElement('span');
+                    textSpan.textContent = originalText;
+                    // textSpan recebe flex-grow para ocupar o espaço central
+                    textSpan.className = 'text-gray-800 break-words flex-grow mr-4 focus:outline-none px-1 border-transparent border focus:border-yellow-400 focus:bg-white transition-all duration-100';
+                    textSpan.setAttribute('contentEditable', 'false');
+                    
+                    // Controlo dos botões Copy, Edit, Delete (lado direito)
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'flex space-x-2 min-w-max items-center';
+
+                    // --- Botões de Ordenação (LADO ESQUERDO) ---
+                    const orderControls = document.createElement('div');
+                    // Adiciona margem direita (mr-4) para separar as setas do texto
+                    orderControls.className = 'flex flex-col space-y-1 mr-4'; 
+
+                    // Botão Mover Para Cima
+                    const upBtn = document.createElement('button');
+                    upBtn.innerHTML = '&#9650;'; // Triângulo para cima
+                    upBtn.className = `p-1 rounded-full text-xs font-bold transition-colors ${index === 0 ? 'bg-gray-200 text-gray-400 cursor-default' : 'bg-green-400 text-white hover:bg-green-500'}`;
+                    upBtn.disabled = index === 0;
+                    upBtn.onclick = () => movePhrase(phraseId, 'up');
+                    orderControls.appendChild(upBtn);
+
+                    // Botão Mover Para Baixo
+                    const downBtn = document.createElement('button');
+                    downBtn.innerHTML = '&#9660;'; // Triângulo para baixo
+                    downBtn.className = `p-1 rounded-full text-xs font-bold transition-colors ${index === phrases.length - 1 ? 'bg-gray-200 text-gray-400 cursor-default' : 'bg-red-400 text-white hover:bg-red-500'}`;
+                    downBtn.disabled = index === phrases.length - 1;
+                    downBtn.onclick = () => movePhrase(phraseId, 'down');
+                    orderControls.appendChild(downBtn);
+                    // --- Fim Botões de Ordenação ---
+
+                    // Botão de Copiar
+                    const copyBtn = document.createElement('button');
+                    copyBtn.textContent = 'Copiar';
+                    copyBtn.className = 'bg-yellow-400 text-gray-800 font-semibold py-1 px-3 rounded-lg hover:bg-yellow-500 transition-colors shadow-sm';
+                    copyBtn.onclick = () => copyPhrase(originalText);
+
+                    // Botão de Editar/Salvar
+                    const editBtn = document.createElement('button');
+                    editBtn.textContent = 'Editar';
+                    editBtn.className = 'bg-blue-500 text-white font-semibold py-1 px-3 rounded-lg hover:bg-blue-600 transition-colors shadow-sm';
+                    editBtn.onclick = async () => {
+                        if (editBtn.textContent === 'Editar') {
+                            // Entrar no modo de edição
+                            textSpan.setAttribute('contentEditable', 'true');
+                            textSpan.focus();
+                            editBtn.textContent = 'Salvar';
+                            editBtn.className = 'bg-green-500 text-white font-semibold py-1 px-3 rounded-lg hover:bg-green-600 transition-colors shadow-sm';
+                            copyBtn.disabled = true;
+                            deleteBtn.disabled = true;
+                        } else {
+                            // Sair do modo de edição e salvar
+                            const newText = textSpan.textContent.trim();
+                            
+                            // Reverte a UI
+                            textSpan.setAttribute('contentEditable', 'false');
+                            editBtn.textContent = 'Editar';
+                            editBtn.className = 'bg-blue-500 text-white font-semibold py-1 px-3 rounded-lg hover:bg-blue-600 transition-colors shadow-sm';
+                            copyBtn.disabled = false;
+                            deleteBtn.disabled = false;
+
+                            if (newText === "") {
+                                 showAlert("Campo Vazio", "A frase não pode ficar vazia. A alteração foi cancelada.");
+                                 textSpan.textContent = originalText; // Revert visually
+                            } else if (newText !== originalText) {
+                                const result = await updatePhrase(phraseId, newText);
+                                if (!result.success) {
+                                    showAlert("Erro ao Salvar", result.message);
+                                    // Firebase onSnapshot will handle reverting textSpan content on error, 
+                                    // but we revert to original if there is a problem.
+                                    textSpan.textContent = originalText; 
+                                } else {
+                                    showToast("Frase atualizada!");
+                                }
+                            }
+                        }
+                    };
+
+                    // Botão de Excluir
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.textContent = 'Excluir';
+                    deleteBtn.className = 'bg-red-500 text-white font-semibold py-1 px-3 rounded-lg hover:bg-red-600 transition-colors shadow-sm';
+                    deleteBtn.onclick = () => showConfirmModal(() => deletePhrase(phraseId));
+                    
+                    // Adiciona os botões de ação (Copy, Edit, Delete) no lado direito
+                    actionsDiv.appendChild(copyBtn);
+                    actionsDiv.appendChild(editBtn); 
+                    actionsDiv.appendChild(deleteBtn);
+                    
+                    // NOVA ORDEM:
+                    phraseDiv.appendChild(orderControls); // 1. Setas de ordenação (Esquerda)
+                    phraseDiv.appendChild(textSpan);    // 2. Texto (Centro, expansível)
+                    phraseDiv.appendChild(actionsDiv);  // 3. Botões de ação (Direita)
+                    
+                    phrasesList.appendChild(phraseDiv);
+                });
+            }, (error) => {
+                console.error("Error getting real-time updates: ", error);
+                showAlert("Erro de Conexão", "Não foi possível obter atualizações em tempo real.");
+            });
+        }
+
+        
+        phraseInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const phraseText = phraseInput.value.trim();
+                if (phraseText === "") {
+                    showAlert("Campo Vazio", "Por favor, digite uma frase antes de adicionar.");
+                    return;
+                }
+                addPhrase(phraseText);
+            }
+        });
+    </script>
+</body>
+</html>
